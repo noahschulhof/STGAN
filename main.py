@@ -10,13 +10,13 @@ torch.backends.cudnn.benchmark = True
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='bay', help='bay or nyc')
+parser.add_argument('--dataset', type=str, default='traffic', help='bay or nyc')
 parser.add_argument('--root_path', type=str, default='./', help='root path: dataset, checkpoint')
 
 parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate.')
 parser.add_argument('--hidden_dim', type=int, default=64, help='Hidden dimension.')
 parser.add_argument('--epoch', type=int, default=6, help='Number of training epochs per iteration.')
-parser.add_argument('--batch_size', type=int, default=256)
+parser.add_argument('--batch_size', type=int, default=16)
 parser.add_argument('--lambda_G', type=int, default=500, help='lambda_G for generator loss function')
 
 parser.add_argument('--num_adj', type=int, default=9, help='number of nodes in sub graph')
@@ -31,10 +31,8 @@ args = parser.parse_args()
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 random.seed(args.seed)
-if args.cpu:
-    args.cuda = False
-elif args.cuda:
-    torch.cuda.manual_seed(args.seed)
+args.cuda = False
+torch.cuda.manual_seed(args.seed)
 
 # parameter
 opt = vars(args)
@@ -52,6 +50,12 @@ elif opt['dataset'] == 'nyc':
     opt['recent_time'] = 2      # bay: 1 hour, nyc: 2hour
     opt['num_feature'] = 2 * 2      # length of input feature
     opt['time_feature'] = 39        # length of time feature
+elif opt['dataset'] == 'traffic':
+    opt['timestamp'] = 12       # e.g., 5-minute intervals → 12 per hour
+    opt['train_time'] = 30      # number of days to train on
+    opt['recent_time'] = 1      # 1 hour recent history
+    opt['num_feature'] = 4 * 3  # lanes * features per lane (speed, volume, occupancy)
+    opt['time_feature'] = 31   
 
 opt['save_path'] = opt['root_path'] + opt['dataset'] + '/checkpoint/'
 opt['data_path'] = opt['root_path'] + opt['dataset'] + '/data/'

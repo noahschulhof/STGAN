@@ -63,49 +63,70 @@ class Generator(nn.Module):
         return output
 
 
+# class Discriminator(nn.Module):
+
+#     def __init__(self, opt):
+#         super(Discriminator, self).__init__()
+
+#         self.opt = opt
+#         self.T_recent = self.opt['recent_time'] * self.opt['timestamp']
+
+#         self.gcn = GCN(opt, input_size=opt['num_feature'], output_size=opt['hidden_dim'])
+
+#         self.seq_network = GCGRUModel(opt)
+#         self.seq_fc = nn.Sequential(
+#             nn.Linear(in_features=opt['hidden_dim'] * opt['num_adj'] // 2, out_features=opt['hidden_dim']),
+#             nn.ReLU(),
+#         )
+
+#         self.trend_network = \
+#             nn.LSTM(input_size=opt['num_feature'], hidden_size=opt['hidden_dim'], num_layers=opt['num_layer'],
+#                     batch_first=True)
+
+#         self.output = nn.Sequential(
+#             nn.Linear(in_features=opt['hidden_dim'] * 2, out_features=opt['hidden_dim']),
+#             nn.ReLU(),
+#             nn.Linear(in_features=opt['hidden_dim'], out_features=1),
+#             nn.Sigmoid()
+#         )
+
+#     def forward(self, sequence, sub_graph, trend_data):
+#         """Discrminator
+#         :param sequence: (B, seq_len, num_node, input_dim) or (seq_len, B, num_node, input_dim)
+#         :param sub_graph: (B, num_nodes, num_nodes)
+#         :param trend_data: (B, seq_len, input_dim)
+#         :return
+#         - Output: `2-D` tensor with shape `(B, 2)`
+#         """
+#         seq, hid = self.seq_network(sequence[:, :-1, ], sub_graph)  # (B, num_adj, rnn_units)
+#         seq_fc = self.seq_fc(seq.view(sequence.shape[0], -1))  # (B, hidden_dim)
+
+#         gcn = self.gcn(sequence[:, -1, ], sub_graph)  # (B, num_adj, hidden_dim)
+#         gcn_pooling = torch.max(gcn, dim=1)[0].squeeze()  # (B, hidden_dim)
+
+#         output = self.output(torch.cat([gcn_pooling, seq_fc], dim=1))
+#         return output
+
 class Discriminator(nn.Module):
-
     def __init__(self, opt):
-        super(Discriminator, self).__init__()
+        super().__init__()
+        h = opt['hidden_dim']
 
-        self.opt = opt
-        self.T_recent = self.opt['recent_time'] * self.opt['timestamp']
+        input_dim = opt['num_feature'] * opt['num_adj']
 
-        self.gcn = GCN(opt, input_size=opt['num_feature'], output_size=opt['hidden_dim'])
-
-        self.seq_network = GCGRUModel(opt)
-        self.seq_fc = nn.Sequential(
-            nn.Linear(in_features=opt['hidden_dim'] * opt['num_adj'] // 2, out_features=opt['hidden_dim']),
-            nn.ReLU(),
-        )
-
-        self.trend_network = \
-            nn.LSTM(input_size=opt['num_feature'], hidden_size=opt['hidden_dim'], num_layers=opt['num_layer'],
-                    batch_first=True)
-
-        self.output = nn.Sequential(
-            nn.Linear(in_features=opt['hidden_dim'] * 2, out_features=opt['hidden_dim']),
-            nn.ReLU(),
-            nn.Linear(in_features=opt['hidden_dim'], out_features=1),
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, h),
+            nn.LeakyReLU(0.2),
+            nn.Linear(h, h // 2),
+            nn.LeakyReLU(0.2),
+            nn.Linear(h // 2, 1),
             nn.Sigmoid()
         )
 
-    def forward(self, sequence, sub_graph, trend_data):
-        """Discrminator
-        :param sequence: (B, seq_len, num_node, input_dim) or (seq_len, B, num_node, input_dim)
-        :param sub_graph: (B, num_nodes, num_nodes)
-        :param trend_data: (B, seq_len, input_dim)
-        :return
-        - Output: `2-D` tensor with shape `(B, 2)`
-        """
-        seq, hid = self.seq_network(sequence[:, :-1, ], sub_graph)  # (B, num_adj, rnn_units)
-        seq_fc = self.seq_fc(seq.view(sequence.shape[0], -1))  # (B, hidden_dim)
+    def forward(self, x):  
+        x = x.view(x.size(0), -1)   # flatten
+        return self.net(x)
 
-        gcn = self.gcn(sequence[:, -1, ], sub_graph)  # (B, num_adj, hidden_dim)
-        gcn_pooling = torch.max(gcn, dim=1)[0].squeeze()  # (B, hidden_dim)
-
-        output = self.output(torch.cat([gcn_pooling, seq_fc], dim=1))
-        return output
 
 
 class GCN(nn.Module):
@@ -202,7 +223,7 @@ class GCGRUModel(nn.Module):
         """
         batch_size = inputs.shape[0]
         if hidden_state is None:
-            hidden_state = torch.zeros((self.num_rnn_layers, batch_size, self.num_nodes, self.rnn_units), device='cuda')
+            hidden_state = torch.zeros((self.num_rnn_layers, batch_size, self.num_nodes, self.rnn_units), device='cpu')
         hidden_states = []
 
         output = inputs
