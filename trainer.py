@@ -282,24 +282,25 @@ class Trainer(object):
                 # -------------------------------------------------
                 #  Train Discriminator  (on final frame only)
                 # -------------------------------------------------
-                self.D_optim.zero_grad()
+                if step % 5 == 0:
+                    self.D_optim.zero_grad()
 
-                # real final frame
-                real_frame = real_data  # (B, num_adj, num_feature)
+                    # real final frame
+                    real_frame = real_data  # (B, num_adj, num_feature)
 
-                # generated fake frame
-                fake_frame = self.G(recent_data, trend_data, sub_graph, time_feature).detach()
+                    # generated fake frame
+                    fake_frame = self.G(recent_data, trend_data, sub_graph, time_feature).detach()
 
-                # Discriminator predictions
-                real_score = self.D(real_frame)
-                fake_score = self.D(fake_frame)
+                    # Discriminator predictions
+                    real_score = self.D(real_frame)
+                    fake_score = self.D(fake_frame)
 
-                real_loss = self.D_loss(real_score, valid)
-                fake_loss = self.D_loss(fake_score, fake)
-                D_total = (real_loss + fake_loss) / 2
+                    real_loss = self.D_loss(real_score, valid)
+                    fake_loss = self.D_loss(fake_score, fake)
+                    D_total = (real_loss + fake_loss) / 2
 
-                D_total.backward()
-                self.D_optim.step()
+                    D_total.backward()
+                    self.D_optim.step()
 
                 # -------------------------------------------------
                 #  Train Generator
@@ -339,6 +340,10 @@ class Trainer(object):
                          mse_loss.item(),
                          binary_loss.item())
                     )
+
+                if step % 1000 == 0:
+                    torch.save(self.G, self.opt['save_path'] + f'G_{step}_{e}.pth')
+                    torch.save(self.D, self.opt['save_path'] + f'D_{step}_{e}.pth')
 
             torch.save(self.G, self.opt['save_path'] + f'G_{e}.pth')
             torch.save(self.D, self.opt['save_path'] + f'D_{e}.pth')
